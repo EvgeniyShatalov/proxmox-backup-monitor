@@ -1,0 +1,11 @@
+trigger_backup:
+  name: Trigger Proxmox Backup
+  description: Start the Proxmox backup script on demand.
+  fields:
+    entry_id:
+      name: Config Entry ID
+      description: Optional config entry ID when multiple Proxmox instances are configured.
+      required: false
+      example: "abc123def456"
+      selector:
+        text:

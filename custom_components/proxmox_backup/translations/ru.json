@@ -3,18 +3,18 @@
     "step": {
       "user": {
         "title": "Мониторинг бэкапов Proxmox",
-        "description": "Введите параметры подключения. Создайте API-токен с ролью `PVEAuditor`: Datacenter → Permissions → API Tokens.",
+        "description": "Введите параметры подключения к Proxmox VE.",
         "data": {
           "host": "Хост (IP или имя)",
-          "user": "Пользователь (например, root@pam)",
+          "user": "Пользователь",
           "token_id": "ID API-токена",
           "token_secret": "Секрет API-токена",
-          "verify_ssl": "Проверять SSL-сертификат"
+          "verify_ssl": "Проверять SSL"
         }
       }
     },
     "error": {
-      "cannot_connect": "Не удалось подключиться. Проверьте хост, данные и сеть."
+      "cannot_connect": "Не удалось подключиться"
     }
   },
   "options": {
@@ -22,9 +22,17 @@
       "init": {
         "title": "Настройки",
         "data": {
-          "scan_interval": "Интервал опроса (минуты)"
+          "scan_interval": "Интервал опроса (минуты)",
+          "trigger_url": "URL триггера бэкапа (опционально)",
+          "trigger_token": "Токен триггера (опционально)"
         }
       }
+    }
+  },
+  "services": {
+    "trigger_backup": {
+      "name": "Запустить бэкап",
+      "description": "Запустить скрипт бэкапа Proxmox по запросу."
     }
   }
 }

@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Proxmox Backup Monitor",
-        "description": "Enter connection details for your Proxmox VE. Create an API token with `PVEAuditor` role.",
+        "description": "Enter connection details for your Proxmox VE.",
         "data": {
           "host": "Host (IP or hostname)",
           "user": "User (e.g. root@pam)",
@@ -22,9 +22,17 @@
       "init": {
         "title": "Options",
         "data": {
-          "scan_interval": "Polling interval (minutes)"
+          "scan_interval": "Polling interval (minutes)",
+          "trigger_url": "Backup trigger URL (optional, e.g. http://192.168.1.100:8099)",
+          "trigger_token": "Backup trigger token (optional)"
         }
       }
+    }
+  },
+  "services": {
+    "trigger_backup": {
+      "name": "Trigger backup",
+      "description": "Start the Proxmox backup script on demand."
     }
   }
 }

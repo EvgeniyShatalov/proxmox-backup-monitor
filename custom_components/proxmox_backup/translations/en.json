@@ -16,5 +16,23 @@
     "error": {
       "cannot_connect": "Failed to connect"
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Options",
+        "data": {
+          "scan_interval": "Polling interval (minutes)",
+          "trigger_url": "Backup trigger URL (optional)",
+          "trigger_token": "Backup trigger token (optional)"
+        }
+      }
+    }
+  },
+  "services": {
+    "trigger_backup": {
+      "name": "Trigger backup",
+      "description": "Start the Proxmox backup script on demand."
+    }
   }
 }
