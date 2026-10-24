@@ -1,0 +1,20 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Proxmox Backup Monitor",
+        "description": "Enter connection details for your Proxmox VE.",
+        "data": {
+          "host": "Host",
+          "user": "User",
+          "token_id": "API Token ID",
+          "token_secret": "API Token Secret",
+          "verify_ssl": "Verify SSL"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect"
+    }
+  }
+}

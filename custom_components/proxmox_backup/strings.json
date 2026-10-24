@@ -1,0 +1,30 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Proxmox Backup Monitor",
+        "description": "Enter connection details for your Proxmox VE. Create an API token with `PVEAuditor` role.",
+        "data": {
+          "host": "Host (IP or hostname)",
+          "user": "User (e.g. root@pam)",
+          "token_id": "API Token ID",
+          "token_secret": "API Token Secret",
+          "verify_ssl": "Verify SSL certificate"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect. Check host, credentials, and network."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Options",
+        "data": {
+          "scan_interval": "Polling interval (minutes)"
+        }
+      }
+    }
+  }
+}

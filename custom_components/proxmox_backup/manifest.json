@@ -1,0 +1,12 @@
+{
+  "domain": "proxmox_backup",
+  "name": "Proxmox Backup Monitor",
+  "codeowners": ["@EvgeniyShatalov"],
+  "config_flow": true,
+  "documentation": "https://github.com/EvgeniyShatalov/proxmox-backup-monitor",
+  "issue_tracker": "https://github.com/EvgeniyShatalov/proxmox-backup-monitor/issues",
+  "iot_class": "local_polling",
+  "requirements": ["proxmoxer==2.1.0", "requests>=2.28.0"],
+  "version": "1.0.0",
+  "integration_type": "device"
+}
