@@ -1,19 +1,14 @@
 # Changelog
 
-## [1.1.0] - 2026-10-25
+## [1.2.3] - 2026-10-25
+
+### Fixed
+- Fixed `get_url` crash in webhook (replaced `prefer_internal` with `allow_external=False`)
+- Fixed incorrect duration and last run timestamp calculation in coordinator
+- Added sleep in trigger method to avoid race condition with Proxmox API
 
 ### Added
-- **Button entity** "Trigger Backup" to start the backup script manually
-- **Service** `proxmox_backup.trigger_backup` for automations
-- Optional HTTP trigger configuration in the options flow
-- New options: `trigger_url`, `trigger_token`
+- New `Current Stage` sensor that listens to webhook events and displays the live progress (e.g., "🚀 Запущен цикл бэкапа...", "✅ Stage 1...").
 
-## [1.0.0] - 2026-10-25
-
-### Added
-- Initial release
-- Sensors: state, exit status, duration, last run, error count, last VMID
-- Config flow with API token authentication
-- Options flow for polling interval
-- Russian and English translations
-- HACS compatibility
+## [1.2.0] - 2026-10-25
+*(...)*

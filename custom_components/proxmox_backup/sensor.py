@@ -11,7 +11,7 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import UnitOfTime
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -34,7 +34,10 @@ SENSORS = (
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     coordinator = entry.runtime_data
-    async_add_entities(ProxmoxBackupSensor(coordinator, entry, desc) for desc in SENSORS)
+    entities = [ProxmoxBackupSensor(coordinator, entry, desc) for desc in SENSORS]
+    # Добавляем сенсор этапов
+    entities.append(ProxmoxBackupStageSensor(hass, entry))
+    async_add_entities(entities)
 
 class ProxmoxBackupSensor(CoordinatorEntity[ProxmoxBackupCoordinator], SensorEntity):
     entity_description: ProxmoxBackupSensorDescription
@@ -52,3 +55,43 @@ class ProxmoxBackupSensor(CoordinatorEntity[ProxmoxBackupCoordinator], SensorEnt
     @property
     def native_value(self) -> Any:
         return self.entity_description.value_fn(self.coordinator.data or {})
+
+
+class ProxmoxBackupStageSensor(SensorEntity):
+    """Сенсор, отображающий текущий этап бэкапа (из вебхуков)."""
+
+    _attr_has_entity_name = True
+    _attr_name = "Current Stage"
+    _attr_icon = "mdi:progress-clock"
+
+    def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
+        self.hass = hass
+        self._attr_unique_id = f"{entry.entry_id}_stage"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, entry.entry_id)},
+            name="Proxmox Backup Monitor",
+        )
+        self._state = "Ожидание"
+        self._attr_extra_attributes = {}
+
+    async def async_added_to_hass(self) -> None:
+        """Подписываемся на события от вебхука."""
+        self.async_on_remove(
+            self.hass.bus.async_listen(f"{DOMAIN}_stage", self._handle_stage_event)
+        )
+
+    @callback
+    def _handle_stage_event(self, event) -> None:
+        """Обновляем сенсор при каждом этапе."""
+        stage = event.data.get("stage", "unknown")
+        message = event.data.get("message", "")
+        self._state = message
+        self._attr_extra_attributes = {
+            "stage_id": stage,
+            "last_update": datetime.now().isoformat()
+        }
+        self.async_write_ha_state()
+
+    @property
+    def native_value(self) -> str:
+        return self._state

@@ -75,8 +75,7 @@ class ProxmoxBackupCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             raise ServiceValidationError(f"Cannot reach trigger: {err}") from err
 
         if resp.status == 202:
-            # Не обновляем сразу, чтобы не ловить старую задачу. 
-            # Дадим Proxmox 5 секунд на старт задачи.
+            # Даем Proxmox 5 секунд, чтобы задача vzdump реально стартовала в API
             await self.hass.async_add_executor_job(time.sleep, 5)
             await self.async_request_refresh()
             return {"status": "triggered"}
@@ -96,7 +95,6 @@ class ProxmoxBackupCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         nodes = self.proxmox.nodes.get()
         all_tasks: list[dict[str, Any]] = []
 
-        # Собираем задачи со всех нод
         for node in nodes:
             node_name = node["node"]
             tasks = self.proxmox.nodes(node_name).tasks.get(
@@ -116,7 +114,6 @@ class ProxmoxBackupCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "last_vmid": None,
             }
 
-        # Сортируем по времени старта (сначала новые)
         all_tasks.sort(key=lambda x: x.get("starttime", 0), reverse=True)
         latest = all_tasks[0]
 
@@ -126,14 +123,12 @@ class ProxmoxBackupCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         starttime = latest.get("starttime", 0)
         endtime = latest.get("endtime")
         
-        # Вычисляем длительность
         duration = 0
         if endtime and starttime:
             duration = endtime - starttime
         elif task_status == "running" and starttime:
             duration = int(time.time()) - starttime
 
-        # Определяем статус
         if task_status == "running":
             state = "running"
         elif exitstatus == "OK":
@@ -141,12 +136,12 @@ class ProxmoxBackupCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         else:
             state = "error"
 
-        # Считаем ошибки за последние 24 часа
-        recent_errors = 0
-        for t in all_tasks:
-            if t.get("status") != "running" and t.get("exitstatus") != "OK":
-                if t.get("endtime", 0) > (starttime - 86400):
-                    recent_errors += 1
+        recent_errors = sum(
+            1
+            for t in all_tasks
+            if t.get("status") not in (None, "running", "OK")
+            and t.get("endtime", 0) > (starttime - 86400)
+        )
 
         return {
             "state": state,
