@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from datetime import timedelta
 from typing import Any
 
@@ -74,6 +75,9 @@ class ProxmoxBackupCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             raise ServiceValidationError(f"Cannot reach trigger: {err}") from err
 
         if resp.status == 202:
+            # Не обновляем сразу, чтобы не ловить старую задачу. 
+            # Дадим Proxmox 5 секунд на старт задачи.
+            await self.hass.async_add_executor_job(time.sleep, 5)
             await self.async_request_refresh()
             return {"status": "triggered"}
         if resp.status == 409:
@@ -92,6 +96,7 @@ class ProxmoxBackupCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         nodes = self.proxmox.nodes.get()
         all_tasks: list[dict[str, Any]] = []
 
+        # Собираем задачи со всех нод
         for node in nodes:
             node_name = node["node"]
             tasks = self.proxmox.nodes(node_name).tasks.get(
@@ -111,24 +116,24 @@ class ProxmoxBackupCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "last_vmid": None,
             }
 
+        # Сортируем по времени старта (сначала новые)
         all_tasks.sort(key=lambda x: x.get("starttime", 0), reverse=True)
         latest = all_tasks[0]
 
-        status = (
-            self.proxmox.nodes(latest["node"])
-            .tasks(latest["upid"])
-            .status.get()
-        )
-        task_status = status.get("status", "unknown")
-        exitstatus = status.get("exitstatus", "unknown")
-
+        task_status = latest.get("status", "unknown")
+        exitstatus = latest.get("exitstatus", "unknown")
+        
+        starttime = latest.get("starttime", 0)
+        endtime = latest.get("endtime")
+        
+        # Вычисляем длительность
         duration = 0
-        if isinstance(task_status, str) and task_status.startswith("stopped:"):
-            try:
-                duration = int(task_status.split(":", 1)[1].strip().split()[0])
-            except (ValueError, IndexError):
-                pass
+        if endtime and starttime:
+            duration = endtime - starttime
+        elif task_status == "running" and starttime:
+            duration = int(time.time()) - starttime
 
+        # Определяем статус
         if task_status == "running":
             state = "running"
         elif exitstatus == "OK":
@@ -136,17 +141,18 @@ class ProxmoxBackupCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         else:
             state = "error"
 
+        # Считаем ошибки за последние 24 часа
+        recent_errors = 0
+        for t in all_tasks:
+            if t.get("status") != "running" and t.get("exitstatus") != "OK":
+                if t.get("endtime", 0) > (starttime - 86400):
+                    recent_errors += 1
+
         return {
             "state": state,
             "exitstatus": exitstatus,
             "duration": duration,
-            "last_run": latest.get("starttime", 0),
+            "last_run": starttime,
             "last_vmid": latest.get("id"),
-            "errors": sum(
-                1
-                for t in all_tasks
-                if t.get("status") not in (None, "running", "OK")
-                and t.get("endtime", 0)
-                > (latest.get("starttime", 0) - 86400)
-            ),
+            "errors": recent_errors,
         }
