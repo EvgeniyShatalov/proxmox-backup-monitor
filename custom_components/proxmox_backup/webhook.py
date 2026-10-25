@@ -35,7 +35,7 @@ async def async_setup_webhook(hass: HomeAssistant, entry) -> str:
 
     async_register(hass, DOMAIN, "Backup Stages", webhook_id, handle_webhook)
 
-    base_url = get_url(hass, require_ssl=False, prefer_internal=True)
+    base_url = get_url(hass, require_ssl=False, allow_external=False)
     return f"{base_url}/api/webhook/{webhook_id}"
 
 
