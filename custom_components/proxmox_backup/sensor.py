@@ -1,6 +1,7 @@
 """Sensors for Proxmox Backup Monitor."""
 from __future__ import annotations
 
+import secrets
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
@@ -16,7 +17,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
+from .const import DOMAIN, CONF_TRIGGER_TOKEN
 from .coordinator import ProxmoxBackupCoordinator
 
 @dataclass(frozen=True, kw_only=True)
@@ -34,9 +35,16 @@ SENSORS = (
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     coordinator = entry.runtime_data
+    
+    # Проверяем, есть ли уже токен в опциях. Если нет — генерируем и сохраняем.
+    if not entry.options.get(CONF_TRIGGER_TOKEN):
+        new_token = secrets.token_hex(32)
+        new_options = {**entry.options, CONF_TRIGGER_TOKEN: new_token}
+        hass.config_entries.async_update_entry(entry, options=new_options)
+
     entities = [ProxmoxBackupSensor(coordinator, entry, desc) for desc in SENSORS]
-    # Добавляем сенсор этапов
     entities.append(ProxmoxBackupStageSensor(hass, entry))
+    entities.append(ProxmoxBackupSetupSensor(coordinator, entry))
     async_add_entities(entities)
 
 class ProxmoxBackupSensor(CoordinatorEntity[ProxmoxBackupCoordinator], SensorEntity):
@@ -58,8 +66,6 @@ class ProxmoxBackupSensor(CoordinatorEntity[ProxmoxBackupCoordinator], SensorEnt
 
 
 class ProxmoxBackupStageSensor(SensorEntity):
-    """Сенсор, отображающий текущий этап бэкапа (из вебхуков)."""
-
     _attr_has_entity_name = True
     _attr_name = "Current Stage"
     _attr_icon = "mdi:progress-clock"
@@ -68,30 +74,49 @@ class ProxmoxBackupStageSensor(SensorEntity):
         self.hass = hass
         self._attr_unique_id = f"{entry.entry_id}_stage"
         self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry.entry_id)},
-            name="Proxmox Backup Monitor",
+            identifiers={(DOMAIN, entry.entry_id)}, name="Proxmox Backup Monitor",
         )
         self._state = "Ожидание"
         self._attr_extra_attributes = {}
 
     async def async_added_to_hass(self) -> None:
-        """Подписываемся на события от вебхука."""
         self.async_on_remove(
             self.hass.bus.async_listen(f"{DOMAIN}_stage", self._handle_stage_event)
         )
 
     @callback
     def _handle_stage_event(self, event) -> None:
-        """Обновляем сенсор при каждом этапе."""
         stage = event.data.get("stage", "unknown")
         message = event.data.get("message", "")
         self._state = message
-        self._attr_extra_attributes = {
-            "stage_id": stage,
-            "last_update": datetime.now().isoformat()
-        }
+        self._attr_extra_attributes = {"stage_id": stage, "last_update": datetime.now().isoformat()}
         self.async_write_ha_state()
 
     @property
     def native_value(self) -> str:
         return self._state
+
+
+class ProxmoxBackupSetupSensor(CoordinatorEntity[ProxmoxBackupCoordinator], SensorEntity):
+    """Сенсор с одной командой для установки триггера на Proxmox."""
+
+    _attr_has_entity_name = True
+    _attr_name = "Host Setup Command"
+    _attr_icon = "mdi:console"
+
+    def __init__(self, coordinator: ProxmoxBackupCoordinator, entry: ConfigEntry) -> None:
+        super().__init__(coordinator)
+        self.entry = entry
+        self._attr_unique_id = f"{entry.entry_id}_setup_command"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, entry.entry_id)}, name="Proxmox Backup Monitor",
+        )
+
+    @property
+    def native_value(self) -> str:
+        """Генерирует однострочную команду для установки."""
+        url = getattr(self.coordinator, "webhook_url", "URL_NOT_READY")
+        token = self.entry.options.get(CONF_TRIGGER_TOKEN, "TOKEN_NOT_READY")
+        
+        # Команда скачивает скрипт установки с GitHub и передает ему URL и Токен
+        return f'curl -sL https://raw.githubusercontent.com/EvgeniyShatalov/proxmox-backup-monitor/main/scripts/install-trigger.sh | bash -s -- "{url}" "{token}"'
