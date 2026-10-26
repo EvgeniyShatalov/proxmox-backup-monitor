@@ -117,9 +117,20 @@ class ProxmoxBackupCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         all_tasks.sort(key=lambda x: x.get("starttime", 0), reverse=True)
         latest = all_tasks[0]
 
-        task_status = latest.get("status", "unknown")
-        exitstatus = latest.get("exitstatus", "unknown")
-        
+        # ВАЖНО: Запрашиваем детальный статус именно последней задачи, 
+        # чтобы получить exitstatus (в списке задач его часто нет)
+        try:
+            status_data = (
+                self.proxmox.nodes(latest["node"])
+                .tasks(latest["upid"])
+                .status.get()
+            )
+            task_status = status_data.get("status", "unknown")
+            exitstatus = status_data.get("exitstatus", "unknown")
+        except Exception:
+            task_status = latest.get("status", "unknown")
+            exitstatus = "unknown"
+
         starttime = latest.get("starttime", 0)
         endtime = latest.get("endtime")
         
@@ -136,12 +147,9 @@ class ProxmoxBackupCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         else:
             state = "error"
 
-        recent_errors = sum(
-            1
-            for t in all_tasks
-            if t.get("status") not in (None, "running", "OK")
-            and t.get("endtime", 0) > (starttime - 86400)
-        )
+        # Считаем ошибки. Если последняя задача упала, ставим 1. 
+        # Точный подсчёт за 24 часа требует много запросов к API.
+        recent_errors = 1 if state == "error" else 0
 
         return {
             "state": state,
