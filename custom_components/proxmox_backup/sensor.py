@@ -36,7 +36,7 @@ SENSORS = (
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     coordinator = entry.runtime_data
     
-    # Проверяем, есть ли уже токен в опциях. Если нет — генерируем и сохраняем.
+    # Генерируем токен, если его нет
     if not entry.options.get(CONF_TRIGGER_TOKEN):
         new_token = secrets.token_hex(32)
         new_options = {**entry.options, CONF_TRIGGER_TOKEN: new_token}
@@ -98,8 +98,6 @@ class ProxmoxBackupStageSensor(SensorEntity):
 
 
 class ProxmoxBackupSetupSensor(CoordinatorEntity[ProxmoxBackupCoordinator], SensorEntity):
-    """Сенсор с одной командой для установки триггера на Proxmox."""
-
     _attr_has_entity_name = True
     _attr_name = "Host Setup Command"
     _attr_icon = "mdi:console"
@@ -114,9 +112,14 @@ class ProxmoxBackupSetupSensor(CoordinatorEntity[ProxmoxBackupCoordinator], Sens
 
     @property
     def native_value(self) -> str:
-        """Генерирует однострочную команду для установки."""
         url = getattr(self.coordinator, "webhook_url", "URL_NOT_READY")
         token = self.entry.options.get(CONF_TRIGGER_TOKEN, "TOKEN_NOT_READY")
         
-        # Команда скачивает скрипт установки с GitHub и передает ему URL и Токен
-        return f'curl -sL https://raw.githubusercontent.com/EvgeniyShatalov/proxmox-backup-monitor/main/scripts/install-trigger.sh | bash -s -- "{url}" "{token}"'
+        # Генерируем команду установки главного скрипта
+        return f'curl -sL https://raw.githubusercontent.com/EvgeniyShatalov/proxmox-backup-monitor/main/scripts/install-proxmox-backup.sh | bash -s -- "{url}" "{token}"'
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return {
+            "instruction": "Скопируйте эту команду и вставьте в терминал Proxmox. Она скачает скрипт бэкапа и настроит автоматизацию."
+        }

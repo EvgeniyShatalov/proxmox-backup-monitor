@@ -1,7 +1,7 @@
 """Constants for Proxmox Backup Monitor."""
 
 DOMAIN = "proxmox_backup"
-VERSION = "1.2.5"
+VERSION = "1.2.6"
 
 CONF_HOST = "host"
 CONF_USER = "user"
