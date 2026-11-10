@@ -49,10 +49,12 @@ mark_error() {
 notify_stage() {
     local stage="$1"
     local message="$2"
+    local duration="${3:-0}" # Третий аргумент: длительность в секундах
+    
     if [ "$WEBHOOK_URL" != "WEBHOOK_URL_PLACEHOLDER" ]; then
         curl -s -X POST "$WEBHOOK_URL" \
             -H "Content-Type: application/json" \
-            -d "{\"stage\": \"$stage\", \"message\": \"$message\"}" \
+            -d "{\"stage\": \"$stage\", \"message\": \"$message\", \"duration\": $duration}" \
             --max-time 5 >/dev/null 2>&1 || true
     fi
 }
@@ -216,12 +218,13 @@ done
 # 7. ИТОГ
 # ============================================================
 END_TIME=$(date +%s)
-DURATION_HUMAN=$(printf '%dm %ds' $(((END_TIME - START_TIME) / 60)) $(((END_TIME - START_TIME) % 60)))
+DURATION=$((END_TIME - START_TIME))
+DURATION_HUMAN=$(printf '%dm %ds' $((DURATION / 60)) $((DURATION % 60)))
 
 if [ "$ERRORS" -eq 0 ]; then
-    notify_stage "done" "🏁 Бэкап успешно завершён за $DURATION_HUMAN"
+    notify_stage "done" "🏁 Бэкап успешно завершён за $DURATION_HUMAN" $DURATION
     exit 0
 else
-    notify_stage "done" "🔴 Бэкап завершён с ошибками ($ERRORS) за $DURATION_HUMAN"
+    notify_stage "done" "🔴 Бэкап завершён с ошибками ($ERRORS) за $DURATION_HUMAN" $DURATION
     exit 1
 fi
