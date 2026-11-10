@@ -27,7 +27,7 @@ class ProxmoxBackupSensorDescription(SensorEntityDescription):
 SENSORS = (
     ProxmoxBackupSensorDescription(key="state", name="Backup State", icon="mdi:backup-restore", value_fn=lambda d: d.get("state", "unknown")),
     ProxmoxBackupSensorDescription(key="exitstatus", name="Backup Exit Status", icon="mdi:check-circle-outline", value_fn=lambda d: d.get("exitstatus", "unknown")),
-    ProxmoxBackupSensorDescription(key="duration", name="Backup Duration", icon="mdi:timer-outline", native_unit_of_measurement=UnitOfTime.SECONDS, device_class=SensorDeviceClass.DURATION, state_class=SensorStateClass.MEASUREMENT, value_fn=lambda d: d.get("duration", 0)),
+    ProxmoxBackupSensorDescription(key="duration", name="Backup Duration (Proxmox)", icon="mdi:timer-outline", native_unit_of_measurement=UnitOfTime.SECONDS, device_class=SensorDeviceClass.DURATION, state_class=SensorStateClass.MEASUREMENT, value_fn=lambda d: d.get("duration", 0)),
     ProxmoxBackupSensorDescription(key="last_run", name="Backup Last Run", icon="mdi:clock-outline", device_class=SensorDeviceClass.TIMESTAMP, value_fn=lambda d: datetime.fromtimestamp(d["last_run"]) if d.get("last_run") else None),
     ProxmoxBackupSensorDescription(key="errors", name="Backup Errors (24h)", icon="mdi:alert-circle-outline", state_class=SensorStateClass.MEASUREMENT, value_fn=lambda d: d.get("errors", 0)),
     ProxmoxBackupSensorDescription(key="last_vmid", name="Backup Last VMID", icon="mdi:server", value_fn=lambda d: str(d.get("last_vmid") or "")),
@@ -44,6 +44,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 
     entities = [ProxmoxBackupSensor(coordinator, entry, desc) for desc in SENSORS]
     entities.append(ProxmoxBackupStageSensor(hass, entry))
+    entities.append(ProxmoxBackupTotalDurationSensor(hass, entry))
     entities.append(ProxmoxBackupSetupSensor(coordinator, entry))
     async_add_entities(entities)
 
@@ -97,6 +98,43 @@ class ProxmoxBackupStageSensor(SensorEntity):
         return self._state
 
 
+class ProxmoxBackupTotalDurationSensor(SensorEntity):
+    """Сенсор общего времени работы скрипта (из вебхука)."""
+
+    _attr_has_entity_name = True
+    _attr_name = "Total Duration"
+    _attr_icon = "mdi:timer-sand"
+    _attr_native_unit_of_measurement = UnitOfTime.SECONDS
+    _attr_device_class = SensorDeviceClass.DURATION
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
+        self.hass = hass
+        self._attr_unique_id = f"{entry.entry_id}_total_duration"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, entry.entry_id)},
+            name="Proxmox Backup Monitor",
+        )
+        self._state = 0
+
+    async def async_added_to_hass(self) -> None:
+        self.async_on_remove(
+            self.hass.bus.async_listen(f"{DOMAIN}_stage", self._handle_stage_event)
+        )
+
+    @callback
+    def _handle_stage_event(self, event) -> None:
+        duration = event.data.get("duration", 0)
+        # Обновляем только если бэкап завершен и передана длительность
+        if duration > 0:
+            self._state = duration
+            self.async_write_ha_state()
+
+    @property
+    def native_value(self) -> int:
+        return self._state
+
+
 class ProxmoxBackupSetupSensor(CoordinatorEntity[ProxmoxBackupCoordinator], SensorEntity):
     _attr_has_entity_name = True
     _attr_name = "Host Setup Command"
@@ -115,11 +153,10 @@ class ProxmoxBackupSetupSensor(CoordinatorEntity[ProxmoxBackupCoordinator], Sens
         url = getattr(self.coordinator, "webhook_url", "URL_NOT_READY")
         token = self.entry.options.get(CONF_TRIGGER_TOKEN, "TOKEN_NOT_READY")
         
-        # Генерируем команду установки главного скрипта
         return f'curl -sL https://raw.githubusercontent.com/EvgeniyShatalov/proxmox-backup-monitor/main/scripts/install-proxmox-backup.sh | bash -s -- "{url}" "{token}"'
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         return {
-            "instruction": "Скопируйте эту команду и вставьте в терминал Proxmox. Она скачает скрипт бэкапа и настроит автоматизацию."
+            "instruction": "Скопируйте эту команду и вставьте в терминал Proxmox."
         }
