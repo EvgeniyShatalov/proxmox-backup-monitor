@@ -1,14 +1,32 @@
 # Changelog
 
-## [1.2.3] - 2026-10-25
+Все значимые изменения в проекте документируются в этом файле.
 
-### Fixed
-- Fixed `get_url` crash in webhook (replaced `prefer_internal` with `allow_external=False`)
-- Fixed incorrect duration and last run timestamp calculation in coordinator
-- Added sleep in trigger method to avoid race condition with Proxmox API
+## [1.2.7] - 2026-11-09
 
 ### Added
-- New `Current Stage` sensor that listens to webhook events and displays the live progress (e.g., "🚀 Запущен цикл бэкапа...", "✅ Stage 1...").
+- **Новый сенсор `Total Duration`:** Добавлен сенсор, отображающий реальное время работы всего скрипта (включая этап выгрузки в облако). Данные приходят напрямую из финального вебхука.
+
+### Changed
+- **Переименование сенсора:** Старый сенсор `Backup Duration` переименован в `Backup Duration (Proxmox)`, так как он отображает время выполнения только задачи `vzdump` на стороне Proxmox API, игнорируя время работы `rclone`.
+- **Обновление Bash-скрипта:** В функцию `notify_stage` добавлен третий аргумент `$DURATION`. Теперь скрипт передает точное количество секунд, затраченное на весь цикл, в финальном уведомлении.
+
+## [1.2.6] - 2026-10-27
+
+### Added
+- **Автоматическая настройка хоста:** Генерация одной команды `curl | bash` в Home Assistant для установки Bash-скрипта, службы `systemd` и вебхук-сервера на Proxmox.
+- В репозиторий добавлены скрипты `scripts/install-proxmox-backup.sh` и `scripts/proxmox-backup-upload.sh`.
 
 ## [1.2.0] - 2026-10-25
-*(...)*
+
+### Added
+- **Отслеживание этапов:** Сенсор `Current Stage` и событие `proxmox_backup_stage` для получения статуса бэкапа в реальном времени.
+- **Ручной запуск:** Кнопка `Trigger Backup` и сервис `proxmox_backup.trigger_backup`.
+- Настройка `Trigger URL` и `Trigger Token` в опциях интеграции.
+
+## [1.0.0] - 2026-10-24
+
+### Added
+- Первый релиз интеграции.
+- Сенсоры: `Backup State`, `Backup Exit Status`, `Backup Duration`, `Backup Last Run`, `Backup Errors (24h)`, `Backup Last VMID`.
+- Настройка через API-токен Proxmox.
