@@ -25,10 +25,19 @@ async def async_setup_webhook(hass: HomeAssistant, entry) -> str:
             data = await request.json()
             stage = data.get("stage", "unknown")
             message = data.get("message", "")
-            _LOGGER.info("Proxmox Backup stage: %s - %s", stage, message)
+            # ДОБАВЛЕНО: Забираем время из запроса
+            duration = data.get("duration", 0) 
+
+            _LOGGER.info("Proxmox Backup stage: %s - %s (duration: %s)", stage, message, duration)
+            
             hass.bus.async_fire(
                 f"{DOMAIN}_stage",
-                {"stage": stage, "message": message},
+                {
+                    "stage": stage, 
+                    "message": message,
+                    # ДОБАВЛЕНО: Передаем время в HA
+                    "duration": duration,
+                },
             )
         except Exception as err:  # noqa: BLE001
             _LOGGER.error("Webhook error: %s", err)
