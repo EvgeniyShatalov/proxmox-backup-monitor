@@ -14,6 +14,9 @@ apt-get update -qq && apt-get install -y -qq curl zstd rclone > /dev/null
 
 echo ">>> Скачивание скрипта бэкапа..."
 curl -sL https://raw.githubusercontent.com/EvgeniyShatalov/proxmox-backup-monitor/main/scripts/proxmox-backup-upload.sh -o /usr/local/bin/proxmox-backup-upload.sh
+
+# Принудительно убираем символы \r из скачанного скрипта (защита от Windows)
+sed -i 's/\r$//' /usr/local/bin/proxmox-backup-upload.sh
 chmod +x /usr/local/bin/proxmox-backup-upload.sh
 
 echo ">>> Внедрение URL вебхука в скрипт..."
@@ -49,6 +52,6 @@ systemctl daemon-reload
 systemctl enable --now proxmox-backup-upload.timer
 
 echo ">>> Настройка HTTP-триггера для HA..."
-curl -sL https://raw.githubusercontent.com/EvgeniyShatalov/proxmox-backup-monitor/main/scripts/install-trigger.sh | bash -s -- "$WEBHOOK_URL" "$TRIGGER_TOKEN"
+curl -sL https://raw.githubusercontent.com/EvgeniyShatalov/proxmox-backup-monitor/main/scripts/install-trigger.sh | sed 's/\r$//' | bash -s -- "$WEBHOOK_URL" "$TRIGGER_TOKEN"
 
 echo ">>> ГОТОВО! Скрипт бэкапа установлен и будет запускаться каждый понедельник в 03:00."

@@ -36,6 +36,7 @@ SENSORS = (
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     coordinator = entry.runtime_data
     
+    # Генерируем токен, если его нет
     if not entry.options.get(CONF_TRIGGER_TOKEN):
         new_token = secrets.token_hex(32)
         new_options = {**entry.options, CONF_TRIGGER_TOKEN: new_token}
@@ -44,7 +45,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     entities = [ProxmoxBackupSensor(coordinator, entry, desc) for desc in SENSORS]
     entities.append(ProxmoxBackupStageSensor(hass, entry))
     entities.append(ProxmoxBackupTotalDurationSensor(hass, entry))
-    entities.append(ProxmoxBackupSetupSensor(coordinator, entry))
+    
+    # Сенсор ProxmoxBackupSetupSensor удален, так как он теперь в text.py
     async_add_entities(entities)
 
 class ProxmoxBackupSensor(CoordinatorEntity[ProxmoxBackupCoordinator], SensorEntity):
@@ -63,6 +65,7 @@ class ProxmoxBackupSensor(CoordinatorEntity[ProxmoxBackupCoordinator], SensorEnt
     @property
     def native_value(self) -> Any:
         return self.entity_description.value_fn(self.coordinator.data or {})
+
 
 class ProxmoxBackupStageSensor(SensorEntity):
     _attr_has_entity_name = True
@@ -95,6 +98,7 @@ class ProxmoxBackupStageSensor(SensorEntity):
     def native_value(self) -> str:
         return self._state
 
+
 class ProxmoxBackupTotalDurationSensor(SensorEntity):
     _attr_has_entity_name = True
     _attr_name = "Total Duration"
@@ -120,6 +124,7 @@ class ProxmoxBackupTotalDurationSensor(SensorEntity):
     @callback
     def _handle_stage_event(self, event) -> None:
         duration = event.data.get("duration", 0)
+        # Обновляем только если бэкап завершен и передана длительность
         if duration > 0:
             self._state = duration
             self.async_write_ha_state()
@@ -127,28 +132,3 @@ class ProxmoxBackupTotalDurationSensor(SensorEntity):
     @property
     def native_value(self) -> int:
         return self._state
-
-class ProxmoxBackupSetupSensor(CoordinatorEntity[ProxmoxBackupCoordinator], SensorEntity):
-    _attr_has_entity_name = True
-    _attr_name = "Host Setup Command"
-    _attr_icon = "mdi:console"
-
-    def __init__(self, coordinator: ProxmoxBackupCoordinator, entry: ConfigEntry) -> None:
-        super().__init__(coordinator)
-        self.entry = entry
-        self._attr_unique_id = f"{entry.entry_id}_setup_command"
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry.entry_id)}, name="Proxmox Backup Monitor",
-        )
-
-    @property
-    def native_value(self) -> str:
-        url = getattr(self.coordinator, "webhook_url", "URL_NOT_READY")
-        token = self.entry.options.get(CONF_TRIGGER_TOKEN, "TOKEN_NOT_READY")
-        return f'curl -sL https://raw.githubusercontent.com/EvgeniyShatalov/proxmox-backup-monitor/main/scripts/install-proxmox-backup.sh | bash -s -- "{url}" "{token}"'
-
-    @property
-    def extra_state_attributes(self) -> dict[str, Any]:
-        return {
-            "instruction": "Скопируйте эту команду и вставьте в терминал Proxmox."
-        }
