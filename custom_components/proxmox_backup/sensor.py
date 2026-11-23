@@ -36,7 +36,6 @@ SENSORS = (
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     coordinator = entry.runtime_data
     
-    # Генерируем токен, если его нет
     if not entry.options.get(CONF_TRIGGER_TOKEN):
         new_token = secrets.token_hex(32)
         new_options = {**entry.options, CONF_TRIGGER_TOKEN: new_token}
@@ -64,7 +63,6 @@ class ProxmoxBackupSensor(CoordinatorEntity[ProxmoxBackupCoordinator], SensorEnt
     @property
     def native_value(self) -> Any:
         return self.entity_description.value_fn(self.coordinator.data or {})
-
 
 class ProxmoxBackupStageSensor(SensorEntity):
     _attr_has_entity_name = True
@@ -97,10 +95,7 @@ class ProxmoxBackupStageSensor(SensorEntity):
     def native_value(self) -> str:
         return self._state
 
-
 class ProxmoxBackupTotalDurationSensor(SensorEntity):
-    """Сенсор общего времени работы скрипта (из вебхука)."""
-
     _attr_has_entity_name = True
     _attr_name = "Total Duration"
     _attr_icon = "mdi:timer-sand"
@@ -125,7 +120,6 @@ class ProxmoxBackupTotalDurationSensor(SensorEntity):
     @callback
     def _handle_stage_event(self, event) -> None:
         duration = event.data.get("duration", 0)
-        # Обновляем только если бэкап завершен и передана длительность
         if duration > 0:
             self._state = duration
             self.async_write_ha_state()
@@ -133,7 +127,6 @@ class ProxmoxBackupTotalDurationSensor(SensorEntity):
     @property
     def native_value(self) -> int:
         return self._state
-
 
 class ProxmoxBackupSetupSensor(CoordinatorEntity[ProxmoxBackupCoordinator], SensorEntity):
     _attr_has_entity_name = True
@@ -152,7 +145,6 @@ class ProxmoxBackupSetupSensor(CoordinatorEntity[ProxmoxBackupCoordinator], Sens
     def native_value(self) -> str:
         url = getattr(self.coordinator, "webhook_url", "URL_NOT_READY")
         token = self.entry.options.get(CONF_TRIGGER_TOKEN, "TOKEN_NOT_READY")
-        
         return f'curl -sL https://raw.githubusercontent.com/EvgeniyShatalov/proxmox-backup-monitor/main/scripts/install-proxmox-backup.sh | bash -s -- "{url}" "{token}"'
 
     @property

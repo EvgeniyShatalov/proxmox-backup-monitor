@@ -25,8 +25,12 @@ async def async_setup_webhook(hass: HomeAssistant, entry) -> str:
             data = await request.json()
             stage = data.get("stage", "unknown")
             message = data.get("message", "")
-            # ДОБАВЛЕНО: Забираем время из запроса
-            duration = data.get("duration", 0) 
+            
+            # Безопасно приводим к int
+            try:
+                duration = int(data.get("duration", 0))
+            except (ValueError, TypeError):
+                duration = 0
 
             _LOGGER.info("Proxmox Backup stage: %s - %s (duration: %s)", stage, message, duration)
             
@@ -35,7 +39,6 @@ async def async_setup_webhook(hass: HomeAssistant, entry) -> str:
                 {
                     "stage": stage, 
                     "message": message,
-                    # ДОБАВЛЕНО: Передаем время в HA
                     "duration": duration,
                 },
             )
