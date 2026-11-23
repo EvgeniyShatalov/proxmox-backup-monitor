@@ -27,11 +27,10 @@ class ProxmoxSetupText(TextEntity):
     _attr_has_entity_name = True
     _attr_name = "Host Setup Command"
     _attr_icon = "mdi:console"
-    _attr_mode = TextMode.PASSWORD  # Оставляем скрытый текст по вашему запросу
-    
-    # Эти два параметра делают поле активным (не серым)
+    _attr_mode = TextMode.PASSWORD
+    _attr_read_only = False
     _attr_native_min = 0
-    _attr_native_max = 512 
+    _attr_native_max = 512
 
     def __init__(self, coordinator: ProxmoxBackupCoordinator, entry: ConfigEntry) -> None:
         self.coordinator = coordinator
@@ -41,19 +40,15 @@ class ProxmoxSetupText(TextEntity):
             identifiers={(DOMAIN, entry.entry_id)},
             name="Proxmox Backup Monitor",
         )
-
-    @property
-    def native_value(self) -> str:
-        """Генерирует команду."""
-        url = getattr(self.coordinator, "webhook_url", "URL_NOT_READY")
-        token = self.entry.options.get(CONF_TRIGGER_TOKEN, "TOKEN_NOT_READY")
         
-        # Добавляем sed 's/\r$//' прямо в команду!
-        return (
+        # Генерируем значение сразу при создании, чтобы поле не было серым
+        url = getattr(coordinator, "webhook_url", "URL_NOT_READY")
+        token = entry.options.get(CONF_TRIGGER_TOKEN, "TOKEN_NOT_READY")
+        self._attr_native_value = (
             f'curl -sL https://raw.githubusercontent.com/EvgeniyShatalov/proxmox-backup-monitor/main/scripts/install-proxmox-backup.sh '
             f'| sed \'s/\\r$//\' | bash -s -- "{url}" "{token}"'
         )
 
     async def async_set_value(self, value: str) -> None:
-        """Разрешаем клик по полю, но не меняем состояние."""
+        """Запрещаем менять значение вручную."""
         pass
