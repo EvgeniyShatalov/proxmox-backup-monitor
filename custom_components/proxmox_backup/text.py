@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from homeassistant.components.text import TextEntity, TextMode
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -28,8 +27,11 @@ class ProxmoxSetupText(TextEntity):
     _attr_has_entity_name = True
     _attr_name = "Host Setup Command"
     _attr_icon = "mdi:console"
-    _attr_mode = TextMode.PASSWORD  # Скрывает текст точками для безопасности
-    _attr_entity_category = EntityCategory.CONFIG
+    _attr_mode = TextMode.PASSWORD  # Оставляем скрытый текст по вашему запросу
+    
+    # Эти два параметра делают поле активным (не серым)
+    _attr_native_min = 0
+    _attr_native_max = 512 
 
     def __init__(self, coordinator: ProxmoxBackupCoordinator, entry: ConfigEntry) -> None:
         self.coordinator = coordinator
@@ -46,12 +48,12 @@ class ProxmoxSetupText(TextEntity):
         url = getattr(self.coordinator, "webhook_url", "URL_NOT_READY")
         token = self.entry.options.get(CONF_TRIGGER_TOKEN, "TOKEN_NOT_READY")
         
-        # Добавляем sed 's/\r$//' прямо в команду! Это спасет от ошибок Windows.
+        # Добавляем sed 's/\r$//' прямо в команду!
         return (
             f'curl -sL https://raw.githubusercontent.com/EvgeniyShatalov/proxmox-backup-monitor/main/scripts/install-proxmox-backup.sh '
             f'| sed \'s/\\r$//\' | bash -s -- "{url}" "{token}"'
         )
 
     async def async_set_value(self, value: str) -> None:
-        """Запрещаем менять значение вручную."""
+        """Разрешаем клик по полю, но не меняем состояние."""
         pass
