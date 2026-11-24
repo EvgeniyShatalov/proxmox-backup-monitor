@@ -4,11 +4,12 @@ from __future__ import annotations
 import logging
 
 from aiohttp.web_request import Request
+from homeassistant.components import persistent_notification
 from homeassistant.components.webhook import async_register, async_unregister
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.network import get_url
 
-from .const import DOMAIN
+from .const import DOMAIN, CONF_NOTIFY_ENTITY
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -26,7 +27,6 @@ async def async_setup_webhook(hass: HomeAssistant, entry) -> str:
             stage = data.get("stage", "unknown")
             message = data.get("message", "")
             
-            # Безопасно приводим к int
             try:
                 duration = int(data.get("duration", 0))
             except (ValueError, TypeError):
@@ -34,6 +34,7 @@ async def async_setup_webhook(hass: HomeAssistant, entry) -> str:
 
             _LOGGER.info("Proxmox Backup stage: %s - %s (duration: %s)", stage, message, duration)
             
+            # 1. Отправляем событие в шину HA (для сенсоров)
             hass.bus.async_fire(
                 f"{DOMAIN}_stage",
                 {
@@ -42,6 +43,28 @@ async def async_setup_webhook(hass: HomeAssistant, entry) -> str:
                     "duration": duration,
                 },
             )
+
+            # 2. Показываем стандартное уведомление в HA (колокольчик)
+            persistent_notification.async_create(
+                hass, 
+                message, 
+                title="Proxmox Backup", 
+                notification_id="proxmox_backup_last_status"
+            )
+
+            # 3. Отправляем во внешний сервис (Telegram, VK и т.д.), если настроено
+            notify_entity = entry.options.get(CONF_NOTIFY_ENTITY)
+            if notify_entity:
+                await hass.services.async_call(
+                    "notify", "send_message",
+                    {
+                        "entity_id": notify_entity, 
+                        "message": message,
+                        "title": "Proxmox Backup"
+                    },
+                    blocking=False,
+                )
+
         except Exception as err:  # noqa: BLE001
             _LOGGER.error("Webhook error: %s", err)
 

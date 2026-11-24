@@ -1,7 +1,7 @@
 """Constants for Proxmox Backup Monitor."""
 
 DOMAIN = "proxmox_backup"
-VERSION = "1.3.6"
+VERSION = "1.3.7"
 
 CONF_HOST = "host"
 CONF_USER = "user"
@@ -11,6 +11,7 @@ CONF_VERIFY_SSL = "verify_ssl"
 CONF_SCAN_INTERVAL = "scan_interval"
 CONF_TRIGGER_URL = "trigger_url"
 CONF_TRIGGER_TOKEN = "trigger_token"
+CONF_NOTIFY_ENTITY = "notify_entity"  # <-- НОВОЕ
 
 DEFAULT_SCAN_INTERVAL = 15
 DEFAULT_VERIFY_SSL = False

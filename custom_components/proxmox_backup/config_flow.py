@@ -8,6 +8,7 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
+from homeassistant.helpers import selector
 from proxmoxer import ProxmoxAPI
 
 from .const import (
@@ -19,6 +20,7 @@ from .const import (
     CONF_TRIGGER_URL,
     CONF_USER,
     CONF_VERIFY_SSL,
+    CONF_NOTIFY_ENTITY,
     DEFAULT_SCAN_INTERVAL,
     DEFAULT_VERIFY_SSL,
     DOMAIN,
@@ -82,7 +84,7 @@ class ProxmoxBackupConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 
 class ProxmoxBackupOptionsFlow(config_entries.OptionsFlow):
-    """Options flow: polling interval + optional backup trigger."""
+    """Options flow: polling interval, trigger, and notify entity."""
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -96,6 +98,7 @@ class ProxmoxBackupOptionsFlow(config_entries.OptionsFlow):
         )
         current_url = self.config_entry.options.get(CONF_TRIGGER_URL, "")
         current_token = self.config_entry.options.get(CONF_TRIGGER_TOKEN, "")
+        current_notify = self.config_entry.options.get(CONF_NOTIFY_ENTITY, "")
 
         data_schema = vol.Schema(
             {
@@ -104,6 +107,10 @@ class ProxmoxBackupOptionsFlow(config_entries.OptionsFlow):
                 ): vol.All(int, vol.Range(min=1, max=1440)),
                 vol.Optional(CONF_TRIGGER_URL, default=current_url): str,
                 vol.Optional(CONF_TRIGGER_TOKEN, default=current_token): str,
+                vol.Optional(
+                    CONF_NOTIFY_ENTITY,
+                    default=current_notify,
+                ): selector.EntitySelector(selector.EntitySelectorConfig(domain="notify")),
             }
         )
         return self.async_show_form(step_id="init", data_schema=data_schema)
