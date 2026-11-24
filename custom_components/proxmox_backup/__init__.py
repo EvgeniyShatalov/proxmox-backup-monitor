@@ -25,12 +25,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     entry.runtime_data = coordinator
     await async_setup_services(hass)
 
-    # 1. Сначала создаем вебхук
+    # Сначала создаем вебхук
     webhook_url = await async_setup_webhook(hass, entry)
-    coordinator.webhook_url = webhook_url  # Сохраняем в координатор
+    coordinator.webhook_url = webhook_url
     _LOGGER.warning("=== PROXMOX BACKUP WEBHOOK URL === %s", webhook_url)
 
-    # 2. Потом создаем сущности (они уже увидят готовый URL)
+    # Потом создаем сущности
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     return True

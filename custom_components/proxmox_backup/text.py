@@ -28,7 +28,7 @@ class ProxmoxSetupText(TextEntity):
     _attr_name = "Host Setup Command"
     _attr_icon = "mdi:console"
     _attr_mode = TextMode.PASSWORD
-    _attr_read_only = False
+    _attr_entity_registry_enabled_default = True
     _attr_native_min = 0
     _attr_native_max = 512
 
@@ -41,7 +41,6 @@ class ProxmoxSetupText(TextEntity):
             name="Proxmox Backup Monitor",
         )
         
-        # Генерируем значение сразу при создании, чтобы поле не было серым
         url = getattr(coordinator, "webhook_url", "URL_NOT_READY")
         token = entry.options.get(CONF_TRIGGER_TOKEN, "TOKEN_NOT_READY")
         self._attr_native_value = (

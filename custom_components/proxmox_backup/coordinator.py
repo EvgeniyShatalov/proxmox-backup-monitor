@@ -45,12 +45,17 @@ class ProxmoxBackupCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             ),
         )
         self.config_entry = entry
-        self.proxmox = ProxmoxAPI(
-            entry.data[CONF_HOST],
-            user=entry.data[CONF_USER],
-            token_name=entry.data[CONF_TOKEN_ID],
-            token_value=entry.data[CONF_TOKEN_SECRET],
-            verify_ssl=entry.data.get(CONF_VERIFY_SSL, DEFAULT_VERIFY_SSL),
+        self.proxmox = None
+        self.webhook_url = "URL_NOT_READY"
+
+    def _create_proxmox_client(self) -> ProxmoxAPI:
+        """Создание клиента Proxmox (в фоновом потоке)."""
+        return ProxmoxAPI(
+            self.config_entry.data[CONF_HOST],
+            user=self.config_entry.data[CONF_USER],
+            token_name=self.config_entry.data[CONF_TOKEN_ID],
+            token_value=self.config_entry.data[CONF_TOKEN_SECRET],
+            verify_ssl=self.config_entry.data.get(CONF_VERIFY_SSL, DEFAULT_VERIFY_SSL),
             timeout=30,
         )
 
@@ -75,7 +80,6 @@ class ProxmoxBackupCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             raise ServiceValidationError(f"Cannot reach trigger: {err}") from err
 
         if resp.status == 202:
-            # Даем Proxmox 5 секунд, чтобы задача vzdump реально стартовала в API
             await self.hass.async_add_executor_job(time.sleep, 5)
             await self.async_request_refresh()
             return {"status": "triggered"}
@@ -87,6 +91,9 @@ class ProxmoxBackupCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     async def _async_update_data(self) -> dict[str, Any]:
         try:
+            if self.proxmox is None:
+                self.proxmox = await self.hass.async_add_executor_job(self._create_proxmox_client)
+                
             return await self.hass.async_add_executor_job(self._fetch_backup_data)
         except Exception as err:  # noqa: BLE001
             raise UpdateFailed(f"Error fetching data: {err}") from err
@@ -117,8 +124,6 @@ class ProxmoxBackupCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         all_tasks.sort(key=lambda x: x.get("starttime", 0), reverse=True)
         latest = all_tasks[0]
 
-        # ВАЖНО: Запрашиваем детальный статус именно последней задачи, 
-        # чтобы получить exitstatus (в списке задач его часто нет)
         try:
             status_data = (
                 self.proxmox.nodes(latest["node"])
@@ -147,9 +152,12 @@ class ProxmoxBackupCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         else:
             state = "error"
 
-        # Считаем ошибки. Если последняя задача упала, ставим 1. 
-        # Точный подсчёт за 24 часа требует много запросов к API.
-        recent_errors = 1 if state == "error" else 0
+        recent_errors = sum(
+            1
+            for t in all_tasks
+            if t.get("status") not in (None, "running", "OK")
+            and t.get("endtime", 0) > (starttime - 86400)
+        )
 
         return {
             "state": state,
