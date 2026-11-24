@@ -4,7 +4,7 @@ from __future__ import annotations
 import secrets
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -28,7 +28,8 @@ SENSORS = (
     ProxmoxBackupSensorDescription(key="state", name="Backup State", icon="mdi:backup-restore", value_fn=lambda d: d.get("state", "unknown")),
     ProxmoxBackupSensorDescription(key="exitstatus", name="Backup Exit Status", icon="mdi:check-circle-outline", value_fn=lambda d: d.get("exitstatus", "unknown")),
     ProxmoxBackupSensorDescription(key="duration", name="Backup Duration (Proxmox)", icon="mdi:timer-outline", native_unit_of_measurement=UnitOfTime.SECONDS, device_class=SensorDeviceClass.DURATION, state_class=SensorStateClass.MEASUREMENT, value_fn=lambda d: d.get("duration", 0)),
-    ProxmoxBackupSensorDescription(key="last_run", name="Backup Last Run", icon="mdi:clock-outline", device_class=SensorDeviceClass.TIMESTAMP, value_fn=lambda d: datetime.fromtimestamp(d["last_run"]) if d.get("last_run") else None),
+    # ИСПРАВЛЕНИЕ: Добавлен tz=timezone.utc
+    ProxmoxBackupSensorDescription(key="last_run", name="Backup Last Run", icon="mdi:clock-outline", device_class=SensorDeviceClass.TIMESTAMP, value_fn=lambda d: datetime.fromtimestamp(d["last_run"], tz=timezone.utc) if d.get("last_run") else None),
     ProxmoxBackupSensorDescription(key="errors", name="Backup Errors (24h)", icon="mdi:alert-circle-outline", state_class=SensorStateClass.MEASUREMENT, value_fn=lambda d: d.get("errors", 0)),
     ProxmoxBackupSensorDescription(key="last_vmid", name="Backup Last VMID", icon="mdi:server", value_fn=lambda d: str(d.get("last_vmid") or "")),
 )
@@ -132,7 +133,7 @@ class ProxmoxBackupTotalDurationSensor(SensorEntity):
 
 
 class ProxmoxBackupSetupSensor(CoordinatorEntity[ProxmoxBackupCoordinator], SensorEntity):
-    """Сенсор с командой установки (без ограничения длины)."""
+    """Сенсор с командой установки."""
 
     _attr_has_entity_name = True
     _attr_name = "Host Setup Command"
@@ -149,12 +150,19 @@ class ProxmoxBackupSetupSensor(CoordinatorEntity[ProxmoxBackupCoordinator], Sens
 
     @property
     def native_value(self) -> str:
-        url = getattr(self.coordinator, "webhook_url", "URL_NOT_READY")
-        token = self.entry.options.get(CONF_TRIGGER_TOKEN, "TOKEN_NOT_READY")
-        return f'curl -sL https://raw.githubusercontent.com/EvgeniyShatalov/proxmox-backup-monitor/main/scripts/install-proxmox-backup.sh | sed \'s/\\r$//\' | bash -s -- "{url}" "{token}"'
+        # Возвращаем короткую строку, так как HA запрещает > 255 символов
+        return "Скопируйте атрибут 'command'"
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
+        # Храним саму команду здесь, так как атрибуты не имеют ограничений по длине
+        url = getattr(self.coordinator, "webhook_url", "URL_NOT_READY")
+        token = self.entry.options.get(CONF_TRIGGER_TOKEN, "TOKEN_NOT_READY")
+        cmd = (
+            f'curl -sL https://raw.githubusercontent.com/EvgeniyShatalov/proxmox-backup-monitor/main/scripts/install-proxmox-backup.sh '
+            f'| sed \'s/\\r$//\' | bash -s -- "{url}" "{token}"'
+        )
         return {
-            "instruction": "Скопируйте значение этого сенсора и вставьте в терминал Proxmox."
+            "command": cmd,
+            "instruction": "Скопируйте значение 'command' и вставьте в терминал Proxmox."
         }
